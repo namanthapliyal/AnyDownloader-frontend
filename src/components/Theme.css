@@ -1,0 +1,12 @@
+/* styles.css */
+
+.light {
+    color: #000; /* Light text color */
+    background-color: #fff; /* Light background color */
+  }
+  
+.dark {
+    color: #fff; /* Dark text color */
+    background-color: #606a73; /* Dark background color */
+  }
+  
