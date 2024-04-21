@@ -13,31 +13,31 @@ const Youtube = () => {
   const [isLoading, setIsLoading] = useState(false);
   //const [fileUrl, setFileUrl] = useState("");
   const [objectId, setObjectId] = useState("");
-  const [eDownload, setEDownload] = useState(false);
+  //const [eDownload, setEDownload] = useState(false);
   const [mtype, setmtype] = useState("");
 
-  const handleDownload = () => {
-    //console.log("Download object:" + objectId);
-    axios
-      .get(`${API}${objectId}/download`, { responseType: "blob" })
-      .then((response) => {
-        // Create a Blob from the PDF Stream
-        const file = new Blob([response.data], {
-          type: response.headers["content-type"],
-        });
-        const fileURL = URL.createObjectURL(file);
+  // const handleDownload = () => {
+  //   //console.log("Download object:" + objectId);
+  //   axios
+  //     .get(`${API}${objectId}/download`, { responseType: "blob" })
+  //     .then((response) => {
+  //       // Create a Blob from the PDF Stream
+  //       const file = new Blob([response.data], {
+  //         type: response.headers["content-type"],
+  //       });
+  //       const fileURL = URL.createObjectURL(file);
 
-        // Create a link and click it to download the file
-        const link = document.createElement("a");
-        link.href = fileURL;
-        link.setAttribute("download", "file");
-        document.body.appendChild(link);
-        link.click();
-      })
-      .catch((error) => {
-        console.error("Error downloading file: ", error);
-      });
-  };
+  //       // Create a link and click it to download the file
+  //       const link = document.createElement("a");
+  //       link.href = fileURL;
+  //       link.setAttribute("download", "file");
+  //       document.body.appendChild(link);
+  //       link.click();
+  //     })
+  //     .catch((error) => {
+  //       console.error("Error downloading file: ", error);
+  //     });
+  // };
 
   const handleClick = () => {
     var playlistPattern =
@@ -79,7 +79,7 @@ const Youtube = () => {
               Number.isInteger(response.data.id)
             ) {
               setObjectId(response.data.id);
-              setEDownload(true);
+              // setEDownload(true);
             } else {
               throw new Error("response.data.id is not an integer");
             }
@@ -91,7 +91,7 @@ const Youtube = () => {
           // Handle the error
           console.error("Error fetching data: ", error);
           setIsLoading(false);
-          setEDownload(false);
+          // setEDownload(false);
         });
     }
   };
