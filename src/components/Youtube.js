@@ -3,15 +3,19 @@
 import React from "react";
 import axios from "axios";
 import { useState } from "react";
+import Playlist from "./Playlist";
+import Video from "./Video";
 
 const API = "http://127.0.0.1:5000/utube";
 
 const Youtube = () => {
   const [dLink, setdLink] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [fileUrl, setFileUrl] = useState("");
+  //const [fileUrl, setFileUrl] = useState("");
   const [objectId, setObjectId] = useState("");
   const [eDownload, setEDownload] = useState(false);
+  const [mtype, setmtype] = useState("");
+
   const handleDownload = () => {
     //console.log("Download object:" + objectId);
     axios
@@ -36,12 +40,23 @@ const Youtube = () => {
   };
 
   const handleClick = () => {
+    var playlistPattern =
+      /^(https?:\/\/)?(www\.)?(youtube\.com\/playlist\?list=)/;
+    var videoPattern = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=)/;
     // Perform additional processing or validation
     if (dLink.trim() === "") {
       alert("Please enter a URL.");
       return;
     } else {
       console.log("Given URL: ", dLink);
+      if (playlistPattern.test(dLink)) {
+        setmtype("playlist");
+      } else if (videoPattern.test(dLink)) {
+        setmtype("video");
+      } else {
+        alert("Invalid URL, not of youtube.");
+        return;
+      }
     }
   };
 
@@ -70,6 +85,7 @@ const Youtube = () => {
             }
           }
           setIsLoading(false);
+          console.log("Object ID: ", response.data.id);
         })
         .catch((error) => {
           // Handle the error
@@ -81,7 +97,7 @@ const Youtube = () => {
   };
   return (
     <>
-      <div className="mb-1">
+      <div className="mb-4" style={{ display: "flex", alignItems: "center" }}>
         <img
           src={process.env.PUBLIC_URL + "/youtube.png"}
           alt="YouTube"
@@ -119,6 +135,8 @@ const Youtube = () => {
               id="exampleInputLink"
               aria-describedby="linkHelp"
               placeholder="Paste the link here"
+              value={dLink}
+              onChange={(e) => setdLink(e.target.value)}
             />
             <div id="linkHelp" className="form-text">
               We'll never share your link with anyone else.
@@ -127,14 +145,28 @@ const Youtube = () => {
           <button
             type="submit"
             className="btn btn-primary"
-            onClick={handleSubmit}
+            onClick={handleClick}
           >
             Submit
           </button>
         </form>
       </div>
       <hr />
-      <div></div>
+      <div className="mx-4">
+        {isLoading ? (
+          <div className="spinner-border text-secondary my-3" role="status">
+            <span className="visually-hidden">Loading...</span>
+          </div>
+        ) : (
+          <>
+            {mtype === "playlist" ? (
+              <Playlist objectId={objectId} />
+            ) : mtype === "video" ? (
+              <Video objectId={objectId} />
+            ) : null}
+          </>
+        )}
+      </div>
     </>
   );
 };

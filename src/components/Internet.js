@@ -118,7 +118,6 @@ const Internet = () => {
           Internet
         </h1>
         <div>
-          {/* Your form here */}
           {isLoading ? (
             <div className="spinner-border text-secondary mx-3" role="status">
               <span className="visually-hidden">Loading...</span>
