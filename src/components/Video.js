@@ -115,8 +115,16 @@ function Video(props) {
     getTitle();
   }, [API]);
 
+  const getEmbedCode = () => {
+    const url = `${props.link}`;
+    const regex = /v=([^&]+)/;
+    const match = url.match(regex);
+    const videoId = match ? match[1] : null;
+    return videoId;
+  };
+
   return (
-    <div className="mb-5 my-3">
+    <div className="mb-5 my-3 p-2">
       <h4 className="my-3 mx-2 d-flex justify-content-center ">
         Video
         {loading ? (
@@ -290,6 +298,17 @@ function Video(props) {
           </tr>
         </tbody>
       </table>
+      <iframe
+        className="d-flex justify-content-center mx-auto my-3"
+        width="560"
+        height="315"
+        src={`https://www.youtube.com/embed/${getEmbedCode()}`}
+        title="YouTube video player"
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        referrerpolicy="strict-origin-when-cross-origin"
+        allowfullscreen
+      ></iframe>
     </div>
   );
 }

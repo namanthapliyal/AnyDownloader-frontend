@@ -162,10 +162,11 @@ const Youtube = () => {
             {mtype === "playlist" ? (
               <Playlist objectId={objectId} />
             ) : mtype === "video" ? (
-              <Video objectId={objectId} />
+              <Video objectId={objectId} link={dLink} />
             ) : null}
           </>
         )}
+        {console.log("dk", dLink)}
       </div>
     </>
   );
