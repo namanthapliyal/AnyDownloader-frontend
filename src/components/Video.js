@@ -1,6 +1,8 @@
 import React from "react";
 import axios from "axios";
 import { useState, useEffect } from "react";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 function Video(props) {
   const API = `http://127.0.0.1:5000/utube/video/${props.objectId}`;
@@ -10,9 +12,119 @@ function Video(props) {
   const [streams, setStreams] = useState([]);
   const [videos, setVideos] = useState([]);
   const [audios, setAudios] = useState([]);
+  const [selectedCaptions, setSelectedCaptions] = useState([]);
+  const [captionProgress, setCaptionProgress] = useStateWithPromise(0);
 
-  const downloadCaptions = () => {
-    console.log("Download captions");
+  const handleCaptionChange = (caption, checked) => {
+    if (checked) {
+      setSelectedCaptions((prev) => [...prev, caption]);
+    } else {
+      setSelectedCaptions((prev) => prev.filter((c) => c !== caption));
+    }
+  };
+
+  function useStateWithPromise(initialState) {
+    const [state, setState] = useState(initialState);
+
+    const setStateWithPromise = (newState) => {
+      return new Promise((resolve) => {
+        setState(newState);
+        resolve(newState);
+      });
+    };
+
+    return [state, setStateWithPromise];
+  }
+
+  const downloadCaptions = async () => {
+    await setCaptionProgress(0);
+    setLoading(true);
+    console.log(selectedCaptions);
+    if (selectedCaptions.length === 0) {
+      setLoading(false);
+      return alert("Please select a caption to download");
+    }
+
+    if (selectedCaptions.length === 1) {
+      console.log(selectedCaptions);
+      axios
+        .get(
+          `${API}/captionsList/download/?caption_lang=${selectedCaptions[0]}`,
+          {
+            onDownloadProgress: async (progressEvent) => {
+              let percentCompleted = Math.round(
+                (progressEvent.loaded * 100) / progressEvent.total
+              );
+              await setCaptionProgress(percentCompleted);
+              console.log(percentCompleted);
+              // Update your progress bar with percentCompleted
+            },
+          }
+        )
+        .then((response) => {
+          const contentDisposition = response.headers["content-disposition"];
+          const filename = contentDisposition.match(/filename="(.+)"/)[1];
+          saveAs(new Blob([response.data]), filename);
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error("Error getting captions: ", error);
+          setLoading(false);
+        });
+    } else {
+      let totalDownloaded = 0; // Total bytes downloaded
+      let totalSize = 0; // Total size of all files
+      const zip = new JSZip();
+      const sizeRequests = selectedCaptions.map((caption) => {
+        return axios
+          .head(`${API}/captionsList/download/?caption_lang=${caption}`)
+          .then((response) => {
+            totalSize += parseInt(response.headers["content-length"]);
+          });
+      });
+      Promise.all(sizeRequests)
+        .then(() => {
+          const requests = selectedCaptions.map((caption) => {
+            console.log("Downloading: " + caption);
+            return axios
+              .get(`${API}/captionsList/download/?caption_lang=${caption}`, {
+                onDownloadProgress: async (progressEvent) => {
+                  totalDownloaded += progressEvent.loaded;
+                  let percentCompleted = Math.round(
+                    (totalDownloaded * 100) / totalSize
+                  );
+                  await setCaptionProgress(percentCompleted);
+                },
+              })
+              .then((response) => {
+                const contentDisposition =
+                  response.headers["content-disposition"];
+                const filename = contentDisposition.match(/filename="(.+)"/)[1];
+                console.log(filename);
+                zip.file(filename, response.data);
+              })
+              .catch((error) => {
+                console.error("Error getting captions: ", error);
+              });
+          });
+
+          Promise.all(requests)
+            .then(() => {
+              return zip.generateAsync({ type: "blob" });
+            })
+            .then((blob) => {
+              saveAs(blob, "captions.zip");
+              setLoading(false);
+            })
+            .catch((error) => {
+              console.error("Error generating zip file: ", error);
+              setLoading(false);
+            });
+        })
+        .catch((error) => {
+          console.error(error);
+        });
+    }
   };
 
   const getCaptions = () => {
@@ -21,7 +133,7 @@ function Video(props) {
     axios
       .get(`${API}/captionsList`)
       .then((response) => {
-        console.log(response.data);
+        console.log("captions: " + response.data);
         setCaptions(response.data);
         console.log(captions);
         setLoading(false);
@@ -62,7 +174,7 @@ function Video(props) {
     let videos = [];
     for (let stream of videoStreams) {
       temp = "";
-      console.log(stream);
+      // console.log(stream);
       if (stream.includes_audio_track === true) {
         temp += "A";
       }
@@ -97,9 +209,9 @@ function Video(props) {
     setLoading(false);
   };
   useEffect(() => {
-    const getTitle = async () => {
+    const getTitle = () => {
       setLoading(true);
-      await axios
+      axios
         .get(`${API}/getTitle/`)
         .then((response) => {
           console.log(response.data);
@@ -125,21 +237,26 @@ function Video(props) {
 
   return (
     <div className="mb-5 my-3 p-2">
-      <h4 className="my-3 mx-2 d-flex justify-content-center ">
+      <h4 className="my-3 mx-2 d-flex  ">
         Video
+        {title ? `: ${title}` : null}
         {loading ? (
           <div className="spinner-grow mx-3" role="status">
             <span className="visually-hidden">Loading...</span>
           </div>
-        ) : title ? (
-          `: ${title}`
         ) : null}
       </h4>
-      <table className="table">
+      <table className="table table-bordered ">
+        <colgroup>
+          <col style={{ width: "15%" }} />
+          <col style={{ width: "15%" }} />
+          <col style={{ width: "70%" }} />
+        </colgroup>
         <thead>
           <tr>
             <th>Function</th>
             <th>Action</th>
+            <th>Progress</th>
           </tr>
         </thead>
         <tbody>
@@ -153,17 +270,7 @@ function Video(props) {
                 onClick={getCaptions}
                 style={{ width: "160px" }}
               >
-                {loading ? (
-                  <span>
-                    <span
-                      className="spinner-border spinner-border-sm"
-                      aria-hidden="true"
-                    ></span>
-                    <span role="status">Loading...</span>
-                  </span>
-                ) : (
-                  "Get caption"
-                )}
+                Get caption
               </button>
               <div className="dropdown">
                 <button
@@ -181,11 +288,17 @@ function Video(props) {
                   className="dropdown-menu"
                   aria-labelledby="dropdownMenuCheckbox"
                 >
-                  {captions.map((caption, index) => (
-                    <li key={index}>
+                  {Object.entries(captions).map(([key, value]) => (
+                    <li key={key}>
                       <label className="dropdown-item">
-                        <input type="checkbox" className="me-2" />
-                        {caption}
+                        <input
+                          type="checkbox"
+                          className="me-2"
+                          onChange={(e) =>
+                            handleCaptionChange(key, e.target.checked)
+                          }
+                        />
+                        {value}
                       </label>
                     </li>
                   ))}
@@ -194,12 +307,29 @@ function Video(props) {
               <button
                 className="btn btn-primary me-2" // Add 'me-2' class for spacing
                 type="button"
-                disabled={true || (loading && captions.length === 0)}
+                disabled={loading || captions.length === 0}
                 onClick={downloadCaptions}
                 style={{ width: "160px" }}
               >
                 Download Caption
               </button>
+            </td>
+            <td>
+              <div
+                className="progress"
+                role="progressbar"
+                aria-label="Example with label"
+                aria-valuenow="25"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                <div
+                  className="progress-bar"
+                  style={{ width: `${captionProgress}%` }}
+                >
+                  {captionProgress}%
+                </div>
+              </div>
             </td>
           </tr>
           <tr>
@@ -248,6 +378,20 @@ function Video(props) {
                 Download Stream
               </button>
             </td>
+            <td>
+              <div
+                className="progress"
+                role="progressbar"
+                aria-label="Example with label"
+                aria-valuenow="25"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                <div className="progress-bar" style={{ width: "0%" }}>
+                  0%
+                </div>
+              </div>
+            </td>
           </tr>
           <tr>
             <td>Audio </td>
@@ -295,6 +439,20 @@ function Video(props) {
                 Download Stream
               </button>
             </td>
+            <td>
+              <div
+                className="progress"
+                role="progressbar"
+                aria-label="Example with label"
+                aria-valuenow="25"
+                aria-valuemin="0"
+                aria-valuemax="100"
+              >
+                <div className="progress-bar" style={{ width: "0%" }}>
+                  0%
+                </div>
+              </div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -304,10 +462,10 @@ function Video(props) {
         height="315"
         src={`https://www.youtube.com/embed/${getEmbedCode()}`}
         title="YouTube video player"
-        frameborder="0"
+        frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        referrerpolicy="strict-origin-when-cross-origin"
-        allowfullscreen
+        referrerPolicy="strict-origin-when-cross-origin"
+        allowFullScreen
       ></iframe>
     </div>
   );
