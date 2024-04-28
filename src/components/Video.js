@@ -138,7 +138,6 @@ function Video(props) {
         });
     }
   };
-
   const downloadVideos = async () => {
     setLoading(true);
     await setVideoProgress(0);
@@ -151,7 +150,7 @@ function Video(props) {
         return Object.keys(video)[0] === selectedVideos[0];
       });
       const itag = tempVid[0][selectedVideos[0]];
-      console.log("itag: " + itag);
+      console.log("Downloading itag: " + itag);
       axios
         .get(`${API}/download/${itag}`, {
           onDownloadProgress: async (progressEvent) => {
@@ -213,26 +212,117 @@ function Video(props) {
                 console.error("Error getting video: ", error);
               });
           });
+          return Promise.all(requests);
+        })
+        .then(() => {
+          setLoading(true); // Add this line to show the loading spinner when downloading multiple files
+          return zip.generateAsync({ type: "blob" });
+        })
+        .then((content) => {
+          saveAs(content, "audios.zip");
 
-          Promise.all(requests)
-            .then(() => {
-              return zip.generateAsync({ type: "blob" });
-            })
-            .then((blob) => {
-              saveAs(blob, "videos.zip");
-              setLoading(false); // Add this line
-            })
-            .catch((error) => {
-              console.error("Error generating zip file: ", error);
-              setLoading(false); // Add this line
-            });
+          setLoading(false); // Hide the loading spinner after download is complete
         })
         .catch((error) => {
           console.error(error);
+          setLoading(false);
         });
     }
-    setLoading(false);
   };
+  // const downloadVideos = async () => {
+  //   setLoading(true);
+  //   await setVideoProgress(0);
+  //   if (selectedVideos.length === 0) {
+  //     setLoading(false);
+  //     return alert("Please select a video to download");
+  //   }
+  //   if (selectedVideos.length === 1) {
+  //     const tempVid = videos.filter((video) => {
+  //       return Object.keys(video)[0] === selectedVideos[0];
+  //     });
+  //     const itag = tempVid[0][selectedVideos[0]];
+  //     console.log("Downloading itag: " + itag);
+  //     axios
+  //       .get(`${API}/download/${itag}`, {
+  //         onDownloadProgress: async (progressEvent) => {
+  //           let percentCompleted = Math.round(
+  //             (progressEvent.loaded * 100) / progressEvent.total
+  //           );
+  //           await setVideoProgress(percentCompleted);
+  //         },
+  //         responseType: "blob",
+  //       })
+  //       .then((response) => {
+  //         const contentDisposition = response.headers["content-disposition"];
+  //         const filename = contentDisposition.match(/filename="(.+)"/)[1];
+  //         saveAs(new Blob([response.data]), filename);
+  //         setLoading(false);
+  //       })
+  //       .catch((error) => {
+  //         console.error("Error getting video: ", error);
+  //         setLoading(false);
+  //       });
+  //   } else {
+  //     let totalDownloaded = 0; // Total bytes downloaded
+  //     let totalSize = 0; // Total size of all files
+  //     const zip = new JSZip();
+  //     const sizeRequests = selectedVideos.map((video) => {
+  //       const tempVid = videos.filter((v) => {
+  //         return Object.keys(v)[0] === video;
+  //       });
+  //       const itag = tempVid[0][video];
+  //       return axios.head(`${API}/download/${itag}`).then((response) => {
+  //         totalSize += parseInt(response.headers["content-length"]);
+  //       });
+  //     });
+  //     Promise.all(sizeRequests)
+  //       .then(() => {
+  //         const requests = selectedVideos.map((video) => {
+  //           const tempVid = videos.filter((v) => {
+  //             return Object.keys(v)[0] === video;
+  //           });
+  //           const itag = tempVid[0][video];
+  //           return axios
+  //             .get(`${API}/download/${itag}`, {
+  //               onDownloadProgress: async (progressEvent) => {
+  //                 totalDownloaded += progressEvent.loaded;
+  //                 let percentCompleted = Math.round(
+  //                   (totalDownloaded * 100) / totalSize
+  //                 );
+  //                 await setVideoProgress(percentCompleted);
+  //               },
+  //               responseType: "blob",
+  //             })
+  //             .then((response) => {
+  //               const contentDisposition =
+  //                 response.headers["content-disposition"];
+  //               const filename = contentDisposition.match(/filename="(.+)"/)[1];
+  //               zip.file(filename, response.data);
+  //             })
+  //             .catch((error) => {
+  //               console.error("Error getting video: ", error);
+  //             });
+  //         });
+
+  //         Promise.all(requests)
+  //           .then(() => {
+  //             return zip.generateAsync({ type: "blob" });
+  //           })
+  //           .then((blob) => {
+  //             saveAs(blob, "videos.zip");
+  //             setLoading(false); // Add this line
+  //           })
+  //           .catch((error) => {
+  //             console.error("Error generating zip file: ", error);
+  //             setLoading(false); // Add this line
+  //           });
+  //       })
+  //       .catch((error) => {
+  //         console.error(error);
+  //       });
+  //   }
+  //   setLoading(false);
+  // };
 
   const downloadCaptions = async () => {
     await setCaptionProgress(0);
@@ -406,28 +496,33 @@ function Video(props) {
       if (streams.length === 0) {
         // Only make the axios call if streams is empty
         console.log("Getting streams");
-        await axios.get(`${API}/getStreams/`).then(async (response) => {
-          let tempStream = [];
-          let temp = "";
-          for (let stream of response.data) {
-            temp = "";
-            if (stream.type === "video") {
-              if (stream.includes_audio_track === true) {
-                temp += "A";
+        await axios
+          .get(`${API}/getStreams/`)
+          .then(async (response) => {
+            let tempStream = [];
+            let temp = "";
+            for (let stream of response.data) {
+              temp = "";
+              if (stream.type === "video") {
+                if (stream.includes_audio_track === true) {
+                  temp += "A";
+                }
+                if (stream.includes_video_track === true) {
+                  temp += "V";
+                }
+                temp += `-${stream.resolution}.${stream.mime_type.split("/")[1]}`;
+              } else if (stream.type === "audio") {
+                temp = "A";
+                temp += `-${stream.abr}.${stream.mime_type.split("/")[1]}`;
               }
-              if (stream.includes_video_track === true) {
-                temp += "V";
-              }
-              temp += `-${stream.resolution}.${stream.mime_type.split("/")[1]}`;
-            } else if (stream.type === "audio") {
-              temp = "A";
-              temp += `-${stream.abr}.${stream.mime_type.split("/")[1]}`;
+              tempStream.push({ [temp]: stream.itag });
             }
-            tempStream.push({ [temp]: stream.itag });
-          }
-          console.log("temp streams: " + tempStream);
-          await setStreams(tempStream);
-        });
+            // console.log("temp streams: " + tempStream);
+            await setStreams(tempStream);
+          })
+          .catch((error) => {
+            console.error("Error getting streams: ", error);
+          });
       }
     };
 
@@ -588,7 +683,6 @@ function Video(props) {
                   className="dropdown-menu"
                   aria-labelledby="dropdownMenuCheckbox"
                 >
-                  {console.log(videos)}
                   {videos.map((i) => {
                     return (
                       <li key={Object.keys(i)[0]}>
